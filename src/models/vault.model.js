@@ -31,6 +31,7 @@ const vaultSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Indicies for faster lookup
 vaultSchema.index({ user: 1 });
 vaultSchema.index({ user: 1, version: 1 });
 
