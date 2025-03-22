@@ -1,0 +1,48 @@
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
+const User = require("../models/user.model");
+
+const generateTokens = (userId) => {
+  const accessToken = jwt.sign({ userId }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN,
+  });
+
+  const refreshToken = jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
+  });
+
+  return { accessToken, refreshToken };
+};
+
+exports.register = async (req, res) => {
+  try {
+    const { email, password, masterKeyVerifier, salt } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exisits" });
+    }
+
+    const newUser = new User({ email, password, masterKeyVerifier, salt });
+    await newUser.save();
+
+    const { accessToken, refreshToken } = generateTokens(newUser._id);
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    newUser.refreshTokens.push({ token: refreshToken, expiresAt });
+
+    await newUser.save();
+
+    res.status(201).json({
+      message: "User registered successfully",
+      accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Error registering user" });
+  }
+};
