@@ -46,3 +46,17 @@ exports.register = async (req, res) => {
     res.status(500).json({ message: "Error registering user" });
   }
 };
+
+exports.login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne(email);
+    if(!user) {
+        return res.status(401).json({message: "Invalid credentials"})
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ message: "Error logging in" });
+  }
+};
