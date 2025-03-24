@@ -94,3 +94,60 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: "Error logging in" });
   }
 };
+
+exports.refreshToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: "Refresh token is required" });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    } catch (error) {
+      return res.status(401).json({ message: "Refresh token invalid" });
+    }
+
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    const tokenExists = user.refreshTokens.some(
+      (token) => token.token === refreshToken && token.expiresAt > new Date()
+    );
+
+    if (!tokenExists) {
+      return res
+        .status(401)
+        .json({ message: "Refresh token expired or invalid" });
+    }
+
+    const newTokens = generateTokens(user._id);
+
+    user.refreshTokens = user.refreshTokens.filter(
+      (token) => token.token !== refreshToken
+    );
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDates() + 7);
+
+    user.refreshTokens.push({
+      token: newTokens,
+      expiresAt,
+    });
+
+    user.lastActive = new Date();
+    await user.save();
+
+    res.status(200).json({
+      accessToken: newTokens.accessToken,
+      refreshToken: newTokens.refreshToken,
+    });
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    res.status(500).json({ mesage: "Error refreshing token" });
+  }
+};
